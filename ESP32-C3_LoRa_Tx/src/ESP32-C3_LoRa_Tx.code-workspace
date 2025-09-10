@@ -1,0 +1,9 @@
+{
+	"folders": [
+		{
+			"name": "ESP32-C3_LoRa_Tx",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
