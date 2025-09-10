@@ -1,44 +1,40 @@
 #include <SPI.h>
 #include <LoRa.h>
+#include <ArduinoJson.h>
 
-// --- Pinovi (prilagodi ako treba) ---
+// --- Pinovi (ESP32 DevKit v1 + Ra-02) ---
 #define LORA_SS    5
 #define LORA_RST   14
 #define LORA_DIO0  2
 #define LED_PIN    4   // LED na GPIO4
 
-// --- Radio postavke (uskladi sa senderom) ---
-const long  FREQ_HZ   = 433375000L; // 433.375 MHz (izbjegava 433.92)
-const int   SF        = 9;          // SF9 "Balanced"
-const long  BW        = 125E3;      // 125 kHz
-const int   CR        = 5;          // coding rate 4/5
-const byte  SYNC_WORD = 0x12;       // isti kao na senderu!
+// --- Radio postavke (mora biti isto kao na TX) ---
+const long  FREQ_HZ   = 433375000L;
+const int   SF        = 9;
+const long  BW        = 125E3;
+const int   CR        = 5;
+const byte  SYNC_WORD = 0x12;
 const bool  USE_CRC   = true;
 
-void blinkLed3x() {
-  for (int i = 0; i < 3; i++) {
-    digitalWrite(LED_PIN, HIGH); delay(150);
-    digitalWrite(LED_PIN, LOW);  delay(150);
-  }
-}
+// stanje LED logike
+bool waterAlarm = false;
 
 void setup() {
   Serial.begin(115200);
   while (!Serial) {}
-  Serial.println(F("LoRa Receiver (HR 433 MHz)"));
+  Serial.println(F("LoRa Receiver (ESP32 DevKit v1 + Ra-02)"));
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
   LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
 
-  // Inicijalizacija na točnoj frekvenciji
+  // Inicijalizacija
   while (!LoRa.begin(FREQ_HZ)) {
     Serial.println(F("LoRa init retry..."));
     delay(500);
   }
 
-  // Uskladi PHY parametre sa senderom
   LoRa.setSpreadingFactor(SF);
   LoRa.setSignalBandwidth(BW);
   LoRa.setCodingRate4(CR);
@@ -46,17 +42,16 @@ void setup() {
   LoRa.setSyncWord(SYNC_WORD);
 
   Serial.println(F("LoRa Initializing OK!"));
-  Serial.print(F("Freq: ")); Serial.print(FREQ_HZ / 1e6, 3); Serial.println(F(" MHz"));
-  Serial.print(F("SF/BW/CR: SF")); Serial.print(SF);
-  Serial.print(F(" / ")); Serial.print((int)(BW/1000)); Serial.print(F(" kHz / 4/")); Serial.println(CR);
-  Serial.print(F("SyncWord: 0x")); Serial.println(SYNC_WORD, HEX);
 }
 
 void loop() {
   int packetSize = LoRa.parsePacket();
-  if (packetSize <= 0) return;
+  if (packetSize <= 0) {
+    // održava LED prema stanju alarm flag-a
+    digitalWrite(LED_PIN, waterAlarm ? HIGH : LOW);
+    return;
+  }
 
-  // Čitanje bajt-po-bajt (bez blokiranja readString() u petlji)
   String msg;
   while (LoRa.available()) {
     msg += (char)LoRa.read();
@@ -65,16 +60,34 @@ void loop() {
   long rssi = LoRa.packetRssi();
   float snr = LoRa.packetSnr();
 
-  Serial.print(F("RX '"));
-  Serial.print(msg);
-  Serial.print(F("' | RSSI "));
-  Serial.print(rssi);
-  Serial.print(F(" dBm | SNR "));
-  Serial.print(snr, 1);
-  Serial.println(F(" dB"));
+  Serial.println(F("---- PACKET ----"));
+  Serial.print(F("RAW: ")); Serial.println(msg);
+  Serial.print(F("RSSI: ")); Serial.print(rssi);
+  Serial.print(F(" dBm | SNR: ")); Serial.print(snr, 1); Serial.println(F(" dB"));
 
-  // LED blink ako sadrži "hello"
-  if (msg.indexOf("hello") != -1) {
-    blinkLed3x();
+  // JSON parsiranje
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, msg);
+
+  if (!err) {
+    if (doc["w"].is<int>()) {
+      int water = doc["w"].as<int>();
+      Serial.print(F("Water Level : ")); Serial.print(water); Serial.println(F(" %"));
+
+      // logika alarma
+      if (water > 20) {
+        waterAlarm = true;  // upali i drži upaljeno
+      } else if (water == 0) {
+        waterAlarm = false; // ugasi kad padne na 0
+      }
+    }
+  } else {
+    Serial.print(F("JSON parse error: "));
+    Serial.println(err.f_str());
   }
+
+  // primjeni stanje na LED
+  digitalWrite(LED_PIN, waterAlarm ? HIGH : LOW);
+
+  Serial.println(F("-----------------"));
 }
