@@ -21,6 +21,38 @@ void App::setup() {
     }
 }
 
+int App::smoothADC_(int sample) {
+    // 1) ring-buffer zadnjih 5 "median-of-7" uzoraka
+    if (adcHistLen_ < 5) {
+        adcHist_[adcHistLen_++] = sample;
+    } else {
+        adcHist_[adcHistIdx_] = sample;
+        adcHistIdx_ = (adcHistIdx_ + 1) % 5;
+    }
+
+    // 2) median preko vremenske povijesti (robustan na outliere)
+    int tmp[5];
+    for (uint8_t i = 0; i < adcHistLen_; ++i) tmp[i] = adcHist_[i];
+    for (uint8_t i = 0; i < adcHistLen_; ++i)
+      for (uint8_t j = i + 1; j < adcHistLen_; ++j)
+        if (tmp[j] < tmp[i]) { int t = tmp[i]; tmp[i] = tmp[j]; tmp[j] = t; }
+    int med = tmp[adcHistLen_ / 2];
+
+    // 3) anti-spike clamp (limitiraj nagle skokove)
+    const int SPIKE = 400; // ~15% tvog opsega (200..2800)
+    if (emaADC_ >= 0) {
+        int diff = med - emaADC_;
+        if (diff >  SPIKE) med = emaADC_ + SPIKE;
+        if (diff < -SPIKE) med = emaADC_ - SPIKE;
+    }
+
+    // 4) EMA low-pass (α = 0.25 => nova mjera 25%, povijest 75%)
+    if (emaADC_ < 0) emaADC_ = med;
+    else             emaADC_ = (emaADC_ * 3 + med) / 4;
+
+    return emaADC_;
+}
+
 void App::loop() {
     unsigned long now = millis();
     float ahtT = NAN, ahtH = NAN, bmpT = NAN, bmpP = NAN;
@@ -33,7 +65,7 @@ void App::loop() {
         last_bmpT_ = bmpT;
         last_bmpP_ = bmpP;
     }
-    waterADC = water_.readMedian();
+    waterADC = smoothADC_(water_.readMedian());
     waterPct = water_.percent(waterADC);
     last_waterADC_ = waterADC;
     last_waterPct_ = waterPct;

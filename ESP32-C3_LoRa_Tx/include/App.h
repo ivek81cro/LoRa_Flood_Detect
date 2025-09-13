@@ -19,4 +19,12 @@ private:
     int last_waterADC_ = 0, last_waterPct_ = 0;
     unsigned long lastLoRaSend_ = 0;
     unsigned long loraInterval_ = 10000;
+        // --- Noise reduction state ---
+    int  adcHist_[5] = {0};
+    uint8_t adcHistLen_ = 0;
+    uint8_t adcHistIdx_ = 0;
+    int  emaADC_ = -1;          // <0 = neinicijalizirano
+
+    int smoothADC_(int sample); // rolling-median + EMA + anti-spike
+
 };
