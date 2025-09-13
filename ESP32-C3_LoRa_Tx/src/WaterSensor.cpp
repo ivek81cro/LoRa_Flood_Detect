@@ -1,8 +1,20 @@
 #include "WaterSensor.h"
 #include <Arduino.h>
 
+#include "WaterSensor.h"
+#include <Arduino.h>
+
+/**
+ * Konstruktor klase WaterSensor.
+ * @param sigPin Pin za analogni signal senzora.
+ * @param pwrPin Pin za upravljanje napajanjem senzora (PNP tranzistor).
+ */
 WaterSensor::WaterSensor(int sigPin, int pwrPin) : sigPin_(sigPin), pwrPin_(pwrPin) {}
 
+/**
+ * Inicijalizacija pinova za senzor vode.
+ * Postavlja pinove i rezoluciju ADC-a.
+ */
 void WaterSensor::begin() const {
     pinMode(pwrPin_, OUTPUT);
     digitalWrite(pwrPin_, HIGH); // OFF
@@ -10,6 +22,11 @@ void WaterSensor::begin() const {
     analogReadResolution(12);
 }
 
+/**
+ * Jednokratno čitanje sirove vrijednosti ADC-a s vodnog senzora.
+ * Uključuje napajanje, čeka stabilizaciju, očitava i isključuje napajanje.
+ * @return Sirova ADC vrijednost.
+ */
 int WaterSensor::readRawOnce() const {
     digitalWrite(pwrPin_, LOW); // ON
     delay(50);
@@ -18,6 +35,11 @@ int WaterSensor::readRawOnce() const {
     return raw;
 }
 
+/**
+ * Vraća medijan od 7 uzoraka ADC-a za robusno mjerenje vlage.
+ * Senzor se uključi jednom, uzima 7 uzoraka, sortira i vraća medijan.
+ * @return Medijan ADC vrijednosti.
+ */
 int WaterSensor::readMedian() const {
     constexpr int N = 7;
     int v[N];
@@ -41,6 +63,12 @@ int WaterSensor::readMedian() const {
     return v[N/2];
 }
 
+/**
+ * Pretvara ADC vrijednost u nivo vode na senzoru.
+ * Kalibracija: dry=200, wet=2800.
+ * @param adc Sirova ADC vrijednost.
+ * @return Postotak vlage (0-100%).
+ */
 int WaterSensor::percent(int adc) const {
     constexpr int dry = 200;
     constexpr int wet = 2800;

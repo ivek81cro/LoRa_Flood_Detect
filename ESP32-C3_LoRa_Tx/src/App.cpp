@@ -3,8 +3,16 @@
 #include "LoRaRadio.h"
 #include <Arduino.h>
 
+/**
+ * Konstruktor glavne aplikacije.
+ * Inicijalizira objekte senzora i LoRa modula.
+ */
 App::App() : water_(config::WATER_SIG_PIN, config::WATER_PWR_PIN), aht_(config::I2C_SDA, config::I2C_SCL) {}
 
+/**
+ * Inicijalizacija svih senzora i LoRa modula.
+ * Postavlja serijsku komunikaciju, inicijalizira senzore i LoRa.
+ */
 void App::setup() {
     Serial.begin(115200);
     delay(100);
@@ -21,6 +29,12 @@ void App::setup() {
     }
 }
 
+/**
+ * Napredna obrada ADC vrijednosti za vodeni senzor.
+ * Kombinira rolling-median, anti-spike i EMA low-pass filter.
+ * @param sample Novi uzorak ADC-a.
+ * @return Filtrirana vrijednost ADC-a.
+ */
 int App::smoothADC_(int sample) {
     // 1) ring-buffer zadnjih 5 "median-of-7" uzoraka
     if (adcHistLen_ < 5) {
@@ -53,6 +67,10 @@ int App::smoothADC_(int sample) {
     return emaADC_;
 }
 
+/**
+ * Glavna petlja aplikacije.
+ * Očitava senzore, filtrira podatke, šalje LoRa poruku i ispisuje podatke.
+ */
 void App::loop() {
     unsigned long now = millis();
     float ahtT = NAN, ahtH = NAN, bmpT = NAN, bmpP = NAN;

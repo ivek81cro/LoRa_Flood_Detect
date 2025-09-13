@@ -1,7 +1,14 @@
 #include "LoRaRadio.h"
 
+/**
+ * Konstruktor LoRaRadio klase.
+ */
 LoRaRadio::LoRaRadio() = default;
 
+/**
+ * Inicijalizacija LoRa modula s definiranim parametrima.
+ * @return true ako je inicijalizacija uspješna, inače false.
+ */
 bool LoRaRadio::begin() {
     SPI.begin(config::SPI_SCK, config::SPI_MISO, config::SPI_MOSI, config::LORA_SS);
     LoRa.setPins(config::LORA_SS, config::LORA_RST, config::LORA_DIO0);
@@ -23,6 +30,11 @@ bool LoRaRadio::begin() {
     return true;
 }
 
+/**
+ * Šalje podatke putem LoRa modula.
+ * @param payload String s podacima za slanje.
+ * @return true ako je slanje uspješno, inače false.
+ */
 bool LoRaRadio::send(const String& payload) {
     LoRa.beginPacket();
     LoRa.print(payload);
@@ -30,6 +42,11 @@ bool LoRaRadio::send(const String& payload) {
     return rc == 1;
 }
 
+/**
+ * Izračunava Time-on-Air (ToA) za LoRa paket.
+ * @param payloadBytes Broj bajtova u paketu.
+ * @return Vrijeme trajanja paketa u milisekundama.
+ */
 double LoRaRadio::calcToA(int payloadBytes) {
     const int preambleLen = 8;
     const bool lowDR = (config::BW == 125000 && config::SF >= 11);
