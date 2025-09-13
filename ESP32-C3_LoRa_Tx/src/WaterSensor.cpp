@@ -21,8 +21,23 @@ int WaterSensor::readRawOnce() const {
 int WaterSensor::readMedian() const {
     constexpr int N = 7;
     int v[N];
-    for (int i = 0; i < N; ++i) { v[i] = readRawOnce(); delay(2); }
-    for (int i = 0; i < N; ++i) for (int j = i+1; j < N; ++j) if (v[j] < v[i]) { int t=v[i]; v[i]=v[j]; v[j]=t; }
+
+    // Uključi senzor samo jednom
+    digitalWrite(pwrPin_, LOW);   // ON (PNP high-side)
+    delay(50);                    // 30–100 ms, po želji
+
+    for (int i = 0; i < N; ++i) {
+        v[i] = analogRead(sigPin_);
+        delay(2);
+    }
+
+    digitalWrite(pwrPin_, HIGH);  // OFF
+
+    // selection sort za N=7 je sasvim ok
+    for (int i = 0; i < N; ++i)
+      for (int j = i + 1; j < N; ++j)
+        if (v[j] < v[i]) { int t=v[i]; v[i]=v[j]; v[j]=t; }
+
     return v[N/2];
 }
 
